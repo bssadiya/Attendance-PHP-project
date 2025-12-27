@@ -1,11 +1,11 @@
 # Attendance Management System
 
-A web-based attendance management system built using **PHP & MySQL**.
+A web based attendance management system built using **PHP & MySQL**.
 
 ## Features
 - Student & admin login
 - Attendance marking
-- Database-backed records
+- Database backed records
 
 ## Tech Stack
 - PHP
