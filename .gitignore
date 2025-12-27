@@ -1,0 +1,26 @@
+# Sensitive files
+config.php
+.env
+
+# Database
+*.sql
+database/
+db_backup/
+
+# Logs & cache
+logs/
+*.log
+cache/
+tmp/
+
+# User uploads
+uploads/
+images/uploads/
+
+# Dependencies
+vendor/
+node_modules/
+
+# OS junk
+.DS_Store
+Thumbs.db
