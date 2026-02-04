@@ -1,168 +1,196 @@
+<?php
+include '../Includes/dbcon.php';
+include '../Includes/session.php';
 
-<?php 
-include 'Includes/dbcon.php';
-session_start();
+/* ===============================
+   1️⃣ SESSION CHECK
+================================ */
+if (!isset($_SESSION['userId'])) {
+  header("Location: ../classTeacherLogin.php");
+  exit();
+}
+
+/* ===============================
+   2️⃣ CHECK ACCOUNT STATUS
+================================ */
+$statusStmt = $conn->prepare(
+  "SELECT status FROM tblclassteacher WHERE Id = ?"
+);
+$statusStmt->bind_param("i", $_SESSION['userId']);
+$statusStmt->execute();
+$statusResult = $statusStmt->get_result()->fetch_assoc();
+$statusStmt->close();
+
+if (!$statusResult || $statusResult['status'] === 'blocked') {
+  session_destroy();
+  header("Location: ../classTeacherLogin.php");
+  exit();
+}
+
+/* ===============================
+   3️⃣ FETCH CLASS DETAILS
+================================ */
+$classStmt = $conn->prepare(
+  "SELECT tblclass.className, tblclassarms.classArmName
+   FROM tblclassteacher
+   INNER JOIN tblclass ON tblclass.Id = tblclassteacher.classId
+   INNER JOIN tblclassarms ON tblclassarms.Id = tblclassteacher.classArmId
+   WHERE tblclassteacher.Id = ?"
+);
+$classStmt->bind_param("i", $_SESSION['userId']);
+$classStmt->execute();
+$classData = $classStmt->get_result()->fetch_assoc();
+$classStmt->close();
+
+/* SAFETY FALLBACK */
+$className = $classData['className'] ?? 'N/A';
+$classArm  = $classData['classArmName'] ?? 'N/A';
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
   <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="">
-  <meta name="author" content="">
-  <link href="img/logo/attnlg.jpg" rel="icon">
-  <title>AMS - Login</title>
-  <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
-  <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css">
-  <link href="css/ruang-admin.min.css" rel="stylesheet">
+  <title>Class Teacher Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <link href="img/logo/attnlg.jpg" rel="icon">
+  <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
+  <link href="../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/ruang-admin.min.css" rel="stylesheet">
 </head>
 
-<body class="bg-gradient-login" style="background-image: url('img/logo/loral1.jpe00g');">
-  <!-- Login Content -->
-  <div class="container-login">
-    <div class="row justify-content-center">
-      <div class="col-xl-10 col-lg-12 col-md-9">
-        <div class="card shadow-sm my-5">
-          <div class="card-body p-0">
-            <div class="row">
-              <div class="col-lg-12">
-                <div class="login-form">
-                <h5 align="center">STUDENT ATTENDANCE SYSTEM</h5>
-                  <div class="text-center">
-                    <img src="img/logo/attnlg.jpg" style="width:100px;height:100px">
-                    <br><br>
-                    <h1 class="h4 text-gray-900 mb-4">Login Panel</h1>
+<body id="page-top">
+
+<div id="wrapper">
+
+  <?php include "Includes/sidebar.php"; ?>
+
+  <div id="content-wrapper" class="d-flex flex-column">
+    <div id="content">
+
+      <?php include "Includes/topbar.php"; ?>
+
+      <div class="container-fluid" id="container-wrapper">
+
+        <div class="d-sm-flex align-items-center justify-content-between mb-4">
+          <h1 class="h3 mb-0 text-gray-800">
+            Class Teacher Dashboard
+            (<?php echo htmlspecialchars("$className - $classArm"); ?>)
+          </h1>
+        </div>
+
+        <div class="row mb-3">
+
+          <!-- STUDENTS COUNT -->
+          <?php
+          $stmt = $conn->prepare(
+            "SELECT id FROM tblstudents WHERE classId = ? AND classArmId = ?"
+          );
+          $stmt->bind_param("ii", $_SESSION['classId'], $_SESSION['classArmId']);
+          $stmt->execute();
+          $students = $stmt->get_result()->num_rows;
+          $stmt->close();
+          ?>
+          <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="row align-items-center">
+                  <div class="col">
+                    <div class="text-xs font-weight-bold text-uppercase mb-1">Students</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $students; ?></div>
                   </div>
-                  <form class="user" method="Post" action="">
-                  <div class="form-group">
-                  <select required name="userType" class="form-control mb-3">
-                          <option value="">--Select User Roles--</option>
-                          <option value="Administrator">Administrator</option>
-                          <option value="ClassTeacher">ClassTeacher</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                      <input type="text" class="form-control" required name="username" id="exampleInputEmail" placeholder="Enter Email Address">
-                    </div>
-                    <div class="form-group">
-                      <input type="password" name = "password" required class="form-control" id="exampleInputPassword" placeholder="Enter Password">
-                    </div>
-                    <div class="form-group">
-                      <div class="custom-control custom-checkbox small" style="line-height: 1.5rem;">
-                        <input type="checkbox" class="custom-control-input" id="customCheck">
-                        <!-- <label class="custom-control-label" for="customCheck">Remember
-                          Me</label> -->
-                      </div>
-                    </div>
-                    <div class="form-group">
-                        <input type="submit"  class="btn btn-success btn-block" value="Login" name="login" />
-                    </div>
-                     </form>
-
-<?php
-
-  if(isset($_POST['login'])){
-
-    $userType = $_POST['userType'];
-    $username = $_POST['username'];
-    $password = $_POST['password'];
-    $password = md5($password);
-
-    if($userType == "Administrator"){
-
-      $query = "SELECT * FROM tbladmin WHERE emailAddress = '$username' AND password = '$password'";
-      $rs = $conn->query($query);
-      $num = $rs->num_rows;
-      $rows = $rs->fetch_assoc();
-
-      if($num > 0){
-
-        $_SESSION['userId'] = $rows['Id'];
-        $_SESSION['firstName'] = $rows['firstName'];
-        $_SESSION['lastName'] = $rows['lastName'];
-        $_SESSION['emailAddress'] = $rows['emailAddress'];
-
-        echo "<script type = \"text/javascript\">
-        window.location = (\"Admin/index.php\")
-        </script>";
-      }
-
-      else{
-
-        echo "<div class='alert alert-danger' role='alert'>
-        Invalid Username/Password!
-        </div>";
-
-      }
-    }
-    else if($userType == "ClassTeacher"){
-
-      $query = "SELECT * FROM tblclassteacher WHERE emailAddress = '$username' AND password = '$password'";
-      $rs = $conn->query($query);
-      $num = $rs->num_rows;
-      $rows = $rs->fetch_assoc();
-
-      if($num > 0){
-
-        $_SESSION['userId'] = $rows['Id'];
-        $_SESSION['firstName'] = $rows['firstName'];
-        $_SESSION['lastName'] = $rows['lastName'];
-        $_SESSION['emailAddress'] = $rows['emailAddress'];
-        $_SESSION['classId'] = $rows['classId'];
-        $_SESSION['classArmId'] = $rows['classArmId'];
-
-        echo "<script type = \"text/javascript\">
-        window.location = (\"ClassTeacher/index.php\")
-        </script>";
-      }
-
-      else{
-
-        echo "<div class='alert alert-danger' role='alert'>
-        Invalid Username/Password!
-        </div>";
-
-      }
-    }
-    else{
-
-        echo "<div class='alert alert-danger' role='alert'>
-        Invalid Username/Password!
-        </div>";
-
-    }
-}
-?>
-
-                    <!-- <hr>
-                    <a href="index.html" class="btn btn-google btn-block">
-                      <i class="fab fa-google fa-fw"></i> Login with Google
-                    </a>
-                    <a href="index.html" class="btn btn-facebook btn-block">
-                      <i class="fab fa-facebook-f fa-fw"></i> Login with Facebook
-                    </a> -->
-
-                
-                  <div class="text-center">
+                  <div class="col-auto">
+                    <i class="fas fa-users fa-2x text-info"></i>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
+          <!-- CLASSES -->
+          <?php
+          $stmt = $conn->prepare("SELECT id FROM tblclass");
+          $stmt->execute();
+          $classes = $stmt->get_result()->num_rows;
+          $stmt->close();
+          ?>
+          <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="row align-items-center">
+                  <div class="col">
+                    <div class="text-xs font-weight-bold text-uppercase mb-1">Classes</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $classes; ?></div>
+                  </div>
+                  <div class="col-auto">
+                    <i class="fas fa-chalkboard fa-2x text-primary"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COURSE CODES -->
+          <?php
+          $stmt = $conn->prepare("SELECT id FROM tblclassarms");
+          $stmt->execute();
+          $classArms = $stmt->get_result()->num_rows;
+          $stmt->close();
+          ?>
+          <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="row align-items-center">
+                  <div class="col">
+                    <div class="text-xs font-weight-bold text-uppercase mb-1">Course Codes</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $classArms; ?></div>
+                  </div>
+                  <div class="col-auto">
+                    <i class="fas fa-code-branch fa-2x text-success"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ATTENDANCE -->
+          <?php
+          $stmt = $conn->prepare(
+            "SELECT id FROM tblattendance WHERE classId = ? AND classArmId = ?"
+          );
+          $stmt->bind_param("ii", $_SESSION['classId'], $_SESSION['classArmId']);
+          $stmt->execute();
+          $attendance = $stmt->get_result()->num_rows;
+          $stmt->close();
+          ?>
+          <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="row align-items-center">
+                  <div class="col">
+                    <div class="text-xs font-weight-bold text-uppercase mb-1">Attendance Records</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $attendance; ?></div>
+                  </div>
+                  <div class="col-auto">
+                    <i class="fas fa-calendar fa-2x text-warning"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
-  </div>
-  <!-- Login Content -->
-  <script src="vendor/jquery/jquery.min.js"></script>
-  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-  <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
-  <script src="js/ruang-admin.min.js"></script>
-</body>
 
+    </div>
+
+    <?php include 'Includes/footer.php'; ?>
+  </div>
+</div>
+
+<script src="../vendor/jquery/jquery.min.js"></script>
+<script src="../vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="js/ruang-admin.min.js"></script>
+</body>
 </html>
