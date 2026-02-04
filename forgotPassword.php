@@ -1,5 +1,4 @@
-
-<?php 
+<?php
 include 'Includes/dbcon.php';
 session_start();
 ?>
@@ -39,7 +38,8 @@ session_start();
                   </div>
                   <form class="user" method="Post" action="">
                     <div class="form-group">
-                      <input type="email" class="form-control" required name="email" id="exampleInputEmail" placeholder="Enter Email Address">
+                      <input type="email" class="form-control" required name="email" id="exampleInputEmail"
+                        placeholder="Enter Email Address">
                     </div>
                     <div class="form-group">
                       <div class="custom-control custom-checkbox small" style="line-height: 1.5rem;">
@@ -49,19 +49,65 @@ session_start();
                       </div>
                     </div>
                     <div class="form-group">
-                        <input type="submit"  class="btn btn-primary btn-block" value="Submit" name="submit" />
+                      <input type="submit" class="btn btn-primary btn-block" value="Submit" name="submit" />
                     </div>
-                     </form>
+                  </form>
 
-                    <?php
+                  <?php
+                  if (isset($_POST['submit'])) {
 
-              if(isset($_POST['submit'])){
-					
-                     
-				}
-			?>
+                    $email = $_POST['email'];
 
-                    <!-- <hr>
+                    // 1️⃣ Check if blocked user exists
+                    $stmt = $conn->prepare(
+                      "SELECT Id FROM tblclassteacher 
+     WHERE emailAddress = ? AND status = 'blocked'"
+                    );
+                    $stmt->bind_param("s", $email);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+
+                    if ($result->num_rows === 1) {
+
+                      // 2️⃣ Generate token + expiry
+                      $token = bin2hex(random_bytes(32));
+                      $expiry = date("Y-m-d H:i:s", strtotime("+15 minutes"));
+
+                      // 3️⃣ Save token
+                      $update = $conn->prepare(
+                        "UPDATE tblclassteacher
+       SET unlock_token = ?, token_expiry = ?
+       WHERE emailAddress = ?"
+                      );
+                      $update->bind_param("sss", $token, $expiry, $email);
+                      $update->execute();
+
+                      // 4️⃣ Unlock link
+                      $unlockLink = "http://localhost/attendance-php/scripts/unlockByEmail.php?token=$token";
+
+                      // 5️⃣ Send email (localhost safe)
+                      mail(
+                        $email,
+                        "Unlock Your Account",
+                        "Your account is locked.\n\nClick below to unlock:\n$unlockLink\n\nThis link expires in 15 minutes."
+                      );
+
+                      echo "<div class='alert alert-success'>
+      Unlock link sent to your email.
+    </div>";
+
+                    } else {
+
+                      echo "<div class='alert alert-danger'>
+      Email not found or account is not locked.
+    </div>";
+
+                    }
+                  }
+                  ?>
+
+
+                  <!-- <hr>
                     <a href="index.html" class="btn btn-google btn-block">
                       <i class="fab fa-google fa-fw"></i> Login with Google
                     </a>
@@ -70,8 +116,10 @@ session_start();
                     </a> -->
                   <hr>
                   <div class="text-center">
-                    <a class="font-weight-bold small" href="memberSetup.php">Create a Memeber Account!</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <a class="font-weight-bold small" href="organizationSetup.php">Setup Cooperative Account!</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a class="font-weight-bold small" href="memberSetup.php">Create a Memeber
+                      Account!</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a class="font-weight-bold small" href="organizationSetup.php">Setup Cooperative
+                      Account!</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     <a class="font-weight-bold small" href="forgotPassword.php">Forgot Password?</a>
 
                   </div>
